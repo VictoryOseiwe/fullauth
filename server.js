@@ -6,6 +6,7 @@ import helment from "helmet";
 dotenv.config();
 import { db } from "./config/db.js";
 import { User } from "./model/user.model.js";
+import authRoutes from "./route/auth.route.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -20,6 +21,9 @@ app.use(express.json());
 app.get("/", (req, res) => {
   res.send("Server is running");
 });
+
+// Auth routes
+app.use("/api/auth", authRoutes);
 
 // synch db
 await db
