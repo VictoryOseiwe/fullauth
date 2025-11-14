@@ -1,10 +1,14 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { User } from "../models/user.model.js";
-import { sendVerificationEmail } from "../utils/email.js";
+import { User } from "../model/user.model.js";
+import {
+  sendPasswordResetEmail,
+  sendVerificationEmail,
+} from "../utils/email.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
 // Token generators
 const generateAccessToken = (user) => {
@@ -12,7 +16,7 @@ const generateAccessToken = (user) => {
 };
 
 const generateRefreshToken = (user) => {
-  return jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: "7d" });
 };
 
 // Register a new user
@@ -109,6 +113,7 @@ export const logIn = async (req, res) => {
     res.status(200).json({
       message: "Login successful",
       accessToken,
+      refreshToken,
       user: {
         id: existingUser.id,
         username: existingUser.username,
@@ -291,14 +296,22 @@ export const changePassword = async (req, res) => {
 };
 
 // reset password
-export const resetPassword = async (req, res) => {
+/* This function sends a password reset email 
+with a frontend url to the user such that when user 
+clicks the link, they are redirected to a page alongside 
+the reset token to send a reset password request. */
+export const resetPasswordRequest = async (req, res) => {
   try {
     const { email } = req.body;
 
     if (!email)
       return res.status(400).json({ message: "Email address is required" });
 
-    const userEmail = await User.findOne({ where: { email } });
+    const userEmail = await User.findOne({
+      where: { email: email.toLowerCase() },
+    });
+
+    const userId = userEmail ? userEmail.id : null;
 
     if (!userEmail)
       return res.status(400).json({ message: "Email address not found" });
@@ -311,11 +324,74 @@ export const resetPassword = async (req, res) => {
       passwordResetExpires: resetTokenExpires,
     });
 
-    await sendPasswordResetEmail(email, resetToken, resetTokenExpires);
+    await sendPasswordResetEmail(email, resetToken, resetTokenExpires, userId);
 
     res.status(200).json({ message: "Password reset email sent successfully" });
   } catch (error) {
     console.error("Reset password error:", error);
     res.status(500).json({ message: "Could not send password reset email" });
+  }
+};
+
+// Resetting users password
+export const resetPassword = async (req, res) => {
+  try {
+    const { userId } = req.query;
+    const { token } = req.query;
+    const { newPassword } = req.body;
+
+    console.log("UserId:", userId);
+    console.log("Token:", token);
+
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    let resetPasswordToken = await User.findOne({
+      where: { passwordResetToken: token },
+    });
+
+    if (!resetPasswordToken)
+      return res.status(400).json({ message: "Invalid or expired token" });
+
+    if (resetPasswordToken.passwordResetExpires < new Date()) {
+      return res.status(400).json({ message: "Token has expired" });
+    }
+
+    if (newPassword.length < 6)
+      return res
+        .status(400)
+        .json({ message: "New password must be at least 6 characters" });
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedNewPassword = await bcrypt.hash(newPassword, salt);
+
+    user.password = hashedNewPassword;
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+
+    await user.save();
+
+    res.status(200).json({ message: "Password reset successfully" });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ message: "Could not reset password" });
+  }
+};
+
+//delete user
+export const deleteUser = async (req, res) => {
+  try {
+    const { user } = req;
+    if (!user) return res.status(404).json({ message: "No user" });
+
+    const isUser = await User.findByPk(user.id);
+    if (!isUser) return res.status(400).json({ message: "User not found" });
+
+    await isUser.destroy();
+
+    res.status(200).json({ message: "Account deleted successfully" });
+  } catch (error) {
+    console.error("Could not delete user account", error);
+    res.status(500).json({ message: "Could not delete account try again." });
   }
 };

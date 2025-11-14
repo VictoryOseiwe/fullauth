@@ -6,10 +6,14 @@ import {
   logIn,
   logOutFromAllBrowsers,
   logOutFromCurrentBrowser,
-  resetPassword,
+  resetPasswordRequest,
   updateUserProfile,
   verifyEmail,
+  deleteUser,
+  resetPassword,
 } from "../controller/auth.controller.js";
+
+import { authenticateToken } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
@@ -20,24 +24,30 @@ router.post("/register", register);
 router.post("/login", logIn);
 
 // Logout from current browser
-router.post("/logout", logOutFromCurrentBrowser);
+router.post("/logout", authenticateToken, logOutFromCurrentBrowser);
 
 // Logout from all browsers
-router.post("/logout-all", logOutFromAllBrowsers);
+router.post("/logout-all", authenticateToken, logOutFromAllBrowsers);
 
 // Get current user
-router.get("/me", getCurrentUser);
+router.get("/me", authenticateToken, getCurrentUser);
 
 // Update user profile
-router.put("/update-profile", updateUserProfile);
+router.put("/update-profile", authenticateToken, updateUserProfile);
 
 // Verify email
 router.get("/verify-email/:token", verifyEmail);
 
 // Change password
-router.post("/change-password", changePassword);
+router.post("/change-password", authenticateToken, changePassword);
 
 // Reset password
+router.post("/request-password-reset", resetPasswordRequest);
+
+// Delete User
+router.delete("/delete-user", authenticateToken, deleteUser);
+
+// Resetting users password
 router.post("/reset-password", resetPassword);
 
 export default router;

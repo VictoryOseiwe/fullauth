@@ -37,8 +37,8 @@ export async function sendVerificationEmail(to, token, expires) {
 }
 
 // send password reset email
-export async function sendPasswordResetEmail(to, token, expires) {
-  const resetLink = `${process.env.APP_URL}/api/auth/reset-password/${token}`;
+export async function sendPasswordResetEmail(to, token, expires, userId) {
+  const resetLink = `${process.env.APP_URL}/api/auth/reset-password?token=${token}&userId=${userId}`; // Frontend url
 
   const mailOptions = {
     from: `"Simple Auth Password Reset" <${process.env.EMAIL_USER}>`,
